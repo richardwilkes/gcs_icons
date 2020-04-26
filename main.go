@@ -19,10 +19,10 @@ import (
 )
 
 func main() {
-	docImg, err := loadImage("artwork_prep/doc.png")
+	docImg, err := loadImage("artifacts/artwork_prep/doc.png")
 	jot.FatalIfErr(err)
 
-	f, err := os.Open("artwork_prep/types")
+	f, err := os.Open("artifacts/artwork_prep/types")
 	jot.FatalIfErr(err)
 	fis, err := f.Readdir(-1)
 	jot.FatalIfErr(err)
@@ -34,12 +34,13 @@ func main() {
 		}
 	}
 
-	for _, dir := range []string{"icns", "ico", "png", "file_associations"} {
+	for _, one := range []string{"icns", "ico", "png", "file_associations"} {
+		dir := "artifacts/" + one
 		jot.FatalIfErr(os.RemoveAll(dir))
 		jot.FatalIfErr(os.MkdirAll(dir, 0755))
 	}
 	for _, dir := range []string{"linux", "macos", "windows"} {
-		jot.FatalIfErr(os.MkdirAll("file_associations/"+dir, 0755))
+		jot.FatalIfErr(os.MkdirAll("artifacts/file_associations/"+dir, 0755))
 	}
 
 	tq := taskqueue.New()
@@ -53,24 +54,43 @@ func main() {
 }
 
 func processAppFileTask() {
-	img, err := loadImage("artwork_prep/app.png")
+	img, err := loadImage("artifacts/artwork_prep/app.png")
 	jot.FatalIfErr(err)
-	writeIcons("app", img)
+	imgs := createIcons(img)
+	name := "app"
+	writeIcns(name, imgs)
+	writeIco(name, imgs)
+	writePng(name, imgs)
+	for _, one := range imgs {
+		f, err := os.Create(fmt.Sprintf("com.trollworks.gcs/resources/images/app_%d.png", one.Bounds().Dx()))
+		jot.FatalIfErr(err)
+		jot.FatalIfErr(png.Encode(f, one))
+		jot.FatalIfErr(f.Close())
+	}
 }
 
 func newProcessDocFileTask(name string, docImg image.Image) taskqueue.Task {
 	return func() {
-		img, err := loadImage("artwork_prep/types/" + name + ".png")
+		img, err := loadImage("artifacts/artwork_prep/types/" + name + ".png")
 		jot.FatalIfErr(err)
-		writeIcons(name+"_doc", icon.Stack(docImg, img))
+		imgs := createIcons(icon.Stack(docImg, img))
+		docName := name + "_doc"
+		writeIcns(docName, imgs)
+		writeIco(docName, imgs)
+		writePng(docName, imgs)
 		writeAssociationFile(name, "linux", "png")
 		writeAssociationFile(name, "macos", "icns")
 		writeAssociationFile(name, "windows", "ico")
+		writeResources(name+"_file", imgs)
+		writeResources(name+"_marker", icon.ScaleTo(img, []image.Point{
+			image.Pt(32, 32),
+			image.Pt(16, 16),
+		}))
 	}
 }
 
 func writeAssociationFile(name, platform, fileType string) {
-	f, err := os.Create("file_associations/" + platform + "/" + name + "_ext.properties")
+	f, err := os.Create("artifacts/file_associations/" + platform + "/" + name + "_ext.properties")
 	jot.FatalIfErr(err)
 	_, err = fmt.Fprintf(f, `extension=%[1]s
 mime-type=application/gcs.%[1]s
@@ -106,8 +126,8 @@ func getDescription(name string) string {
 	}
 }
 
-func writeIcons(name string, img image.Image) {
-	imgs := icon.ScaleTo(img, []image.Point{
+func createIcons(img image.Image) []image.Image {
+	return icon.ScaleTo(img, []image.Point{
 		image.Pt(1024, 1024),
 		image.Pt(512, 512),
 		image.Pt(256, 256),
@@ -117,20 +137,38 @@ func writeIcons(name string, img image.Image) {
 		image.Pt(32, 32),
 		image.Pt(16, 16),
 	})
+}
 
-	f, err := os.Create("icns/" + name + ".icns")
+func writeIcns(name string, imgs []image.Image) {
+	f, err := os.Create("artifacts/icns/" + name + ".icns")
 	jot.FatalIfErr(err)
 	jot.FatalIfErr(icns.Encode(f, getImages([]int{1024, 512, 256, 128, 64, 32, 16}, imgs)...))
 	jot.FatalIfErr(f.Close())
+}
 
-	f, err = os.Create("ico/" + name + ".ico")
+func writeIco(name string, imgs []image.Image) {
+	f, err := os.Create("artifacts/ico/" + name + ".ico")
 	jot.FatalIfErr(err)
 	jot.FatalIfErr(ico.Encode(f, getImages([]int{256, 48, 32, 16}, imgs)...))
 	jot.FatalIfErr(f.Close())
+}
 
-	f, err = os.Create("png/" + name + ".png")
+func writePng(name string, imgs []image.Image) {
+	f, err := os.Create("artifacts/png/" + name + ".png")
 	jot.FatalIfErr(err)
 	jot.FatalIfErr(png.Encode(f, getImage(256, imgs)))
+	jot.FatalIfErr(f.Close())
+}
+
+func writeResources(name string, imgs []image.Image) {
+	f, err := os.Create("com.trollworks.gcs/resources/images/" + name + ".png")
+	jot.FatalIfErr(err)
+	jot.FatalIfErr(png.Encode(f, getImage(16, imgs)))
+	jot.FatalIfErr(f.Close())
+
+	f, err = os.Create("com.trollworks.gcs/resources/images/" + name + "@2x.png")
+	jot.FatalIfErr(err)
+	jot.FatalIfErr(png.Encode(f, getImage(32, imgs)))
 	jot.FatalIfErr(f.Close())
 }
 
