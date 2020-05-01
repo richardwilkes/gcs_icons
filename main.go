@@ -81,11 +81,11 @@ func newProcessDocFileTask(name string, docImg image.Image) taskqueue.Task {
 		writeAssociationFile(name, "linux", "png")
 		writeAssociationFile(name, "macos", "icns")
 		writeAssociationFile(name, "windows", "ico")
-		writeResources(name+"_file", imgs)
+		writeResources(name+"_file", imgs, 16)
 		writeResources(name+"_marker", icon.ScaleTo(img, []image.Point{
-			image.Pt(32, 32),
-			image.Pt(16, 16),
-		}))
+			image.Pt(128, 128),
+			image.Pt(64, 64),
+		}), 64)
 	}
 }
 
@@ -160,15 +160,15 @@ func writePng(name string, imgs []image.Image) {
 	jot.FatalIfErr(f.Close())
 }
 
-func writeResources(name string, imgs []image.Image) {
+func writeResources(name string, imgs []image.Image, baseSize int) {
 	f, err := os.Create("com.trollworks.gcs/resources/images/" + name + ".png")
 	jot.FatalIfErr(err)
-	jot.FatalIfErr(png.Encode(f, getImage(16, imgs)))
+	jot.FatalIfErr(png.Encode(f, getImage(baseSize, imgs)))
 	jot.FatalIfErr(f.Close())
 
 	f, err = os.Create("com.trollworks.gcs/resources/images/" + name + "@2x.png")
 	jot.FatalIfErr(err)
-	jot.FatalIfErr(png.Encode(f, getImage(32, imgs)))
+	jot.FatalIfErr(png.Encode(f, getImage(baseSize*2, imgs)))
 	jot.FatalIfErr(f.Close())
 }
 
